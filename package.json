@@ -1,0 +1,20 @@
+{
+  "name": "microcms-openapi",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "generate": "node generate-openapi.mjs ./schemas openapi.yaml",
+    "build:docs": "node build-docs.mjs",
+    "build": "npm run generate && npm run build:docs",
+    "preview": "node build-docs.mjs --serve",
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@12.3.4",
+  "devDependencies": {
+    "yaml": "^2.9.0"
+  }
+}

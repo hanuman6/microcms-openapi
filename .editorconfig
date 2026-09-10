@@ -1,0 +1,34 @@
+# このファイルより上の階層の.editorconfigファイルは評価しない
+root = true
+
+[*]
+# 文字コードはUTF-8
+charset = utf-8
+# 改行コードはLF
+end_of_line = lf
+# 行末の空白文字を削除
+trim_trailing_whitespace = true
+# ファイルの末尾が改行でない時に補完
+insert_final_newline = true
+
+[*.{php,tpl,html,ejs,pug}]
+# インデントはスペース4つ分
+indent_style = space
+indent_size = 4
+
+[*.{css,scss,js,vue,jsx,ts,tsx,es6}]
+# インデントはスペース2つ分
+indent_style = space
+indent_size = 2
+
+[*.{js,vue,jsx,ts,tsx,es6}]
+# JSはシングルクォーテーション
+quote_type = single
+
+[*.md]
+# Markdownの時は行末の空白文字を削除しない
+trim_trailing_whitespace = false
+
+[*.yml]
+indent_style = space
+indent_size = 2

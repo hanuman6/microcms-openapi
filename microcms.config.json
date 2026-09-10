@@ -1,0 +1,6 @@
+{
+  "serviceId": "hot-factory",
+  "title": "自社サイト microCMS Content API",
+  "description": "microCMSスキーマから自動生成されたOpenAPI仕様書",
+  "version": "1.0.0"
+}
