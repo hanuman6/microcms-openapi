@@ -74,7 +74,17 @@ if (engine === 'redoc') {
   <script>
     const spec = ${JSON.stringify(specJson)};
     Redoc.init(spec, {
-      scrollYOffset: 0
+      scrollYOffset: 0,
+      showExtensions: true,
+      'show-extensions': true,
+      schemaDefinitionsTagName: 'スキーマ定義 (Schemas)',
+      'schema-definitions-tag-name': 'スキーマ定義 (Schemas)',
+      expandResponses: '200,201',
+      theme: {
+        openapi: {
+          schemaDefinitionsTagName: 'スキーマ定義 (Schemas)',
+        },
+      },
     }, document.getElementById('redoc-container'));
   </script>
 </body>

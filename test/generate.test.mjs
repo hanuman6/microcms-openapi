@@ -220,3 +220,119 @@ test('generateOpenApi integration with config and custom endpoints', () => {
     // 後片付け
     fs.rmSync(tmpDir, { recursive: true, force: true });
 });
+
+test('mapFieldToSchema: relation and relationList include referencedApiEndpoint and field name metadata', () => {
+    const endpointContext = {
+        endpoints: new Map([
+            [
+                'sites',
+                {
+                    displayName: 'サイトマスタ',
+                    modelName: 'Sites',
+                    fieldsMap: new Map([
+                        ['title', { fieldId: 'title', name: 'サイト名' }],
+                    ]),
+                },
+            ],
+        ]),
+        customFields: new Map(),
+    };
+
+    const relationField = {
+        fieldId: 'site',
+        name: '所属サイト',
+        kind: 'relation',
+        referencedApiEndpoint: 'sites',
+        listViewFieldId: 'title',
+        required: false,
+    };
+
+    const schemaSingle = mapFieldToSchema(relationField, 'test', {}, new Set(), {}, endpointContext);
+    assert.equal(schemaSingle['x-referenced-api-endpoint'], 'sites');
+    assert.equal(schemaSingle['x-referenced-api-name'], 'サイトマスタ');
+    assert.equal(schemaSingle['x-list-view-field-id'], 'title');
+    assert.equal(schemaSingle['x-list-view-field-name'], 'サイト名');
+    assert.match(schemaSingle.description, /参照先API: sites \(サイトマスタ\)/);
+    assert.match(schemaSingle.description, /参照フィールド: title \(サイト名\)/);
+
+    const relationListField = {
+        fieldId: 'sites',
+        name: '掲載先一覧',
+        kind: 'relationList',
+        referencedApiEndpoint: 'sites',
+        listViewFieldId: 'title',
+        required: true,
+    };
+
+    const schemaList = mapFieldToSchema(relationListField, 'test', {}, new Set(), {}, endpointContext);
+    assert.equal(schemaList['x-referenced-api-endpoint'], 'sites');
+    assert.equal(schemaList['x-referenced-api-name'], 'サイトマスタ');
+    assert.equal(schemaList['x-list-view-field-id'], 'title');
+    assert.equal(schemaList['x-list-view-field-name'], 'サイト名');
+    assert.match(schemaList.description, /参照先API: sites \(サイトマスタ\)/);
+    assert.match(schemaList.description, /参照フィールド: title \(サイト名\)/);
+});
+
+test('mapFieldToSchema: repeater and customField include referenced customField names', () => {
+    const endpointContext = {
+        endpoints: new Map(),
+        customFields: new Map([
+            ['test_blockA', { fieldId: 'blockA', name: 'ブロックA' }],
+            ['blockA', { fieldId: 'blockA', name: 'ブロックA' }],
+        ]),
+    };
+
+    const repeaterField = {
+        fieldId: 'blocks',
+        name: 'ブロックリスト',
+        kind: 'repeater',
+        customFieldIds: ['blockA'],
+        required: true,
+    };
+
+    const schema = mapFieldToSchema(
+        repeaterField,
+        'test',
+        { test_blockA: 'CustomField_Test_BlockA' },
+        new Set(),
+        {},
+        endpointContext
+    );
+    assert.deepEqual(schema['x-custom-field-ids'], ['blockA']);
+    assert.deepEqual(schema['x-custom-field-names'], ['ブロックA']);
+    assert.match(schema.description, /参照カスタムフィールド: ブロックA \(blockA\)/);
+});
+
+test('generateOpenApi: registers all customFields in components.schemas even when unreferenced', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'microcms-cf-test-'));
+    const bannerSchema = {
+        apiType: 'list',
+        apiFields: [
+            { fieldId: 'title', name: 'タイトル', kind: 'text', required: true },
+        ],
+        customFields: [
+            {
+                fieldId: 'unreferenced_cf',
+                name: '未参照カスタムフィールド',
+                fields: [
+                    { fieldId: 'subTitle', name: 'サブタイトル', kind: 'text', required: false },
+                ],
+            },
+        ],
+    };
+
+    const file = path.join(tmpDir, 'banners.json');
+    fs.writeFileSync(file, JSON.stringify(bannerSchema), 'utf-8');
+
+    const doc = generateOpenApi([file], {});
+    assert.ok(
+        doc.components.schemas.CustomField_Banners_UnreferencedCf,
+        '未参照のカスタムフィールドもcomponents.schemasに登録されること'
+    );
+    const cfSchema = doc.components.schemas.CustomField_Banners_UnreferencedCf;
+    assert.equal(cfSchema['x-custom-field-id'], 'unreferenced_cf');
+    assert.equal(cfSchema['x-custom-field-name'], '未参照カスタムフィールド');
+    assert.ok(cfSchema.properties.subTitle);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+});

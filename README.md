@@ -29,6 +29,12 @@ microCMS の管理画面からエクスポートしたスキーマ JSON（**無�
   - `select` フィールドの配列出力（単一選択時でも microCMS 仕様どおり `type: array, maxItems: 1`）
   - `customField`（単一オブジェクト）と `repeater`（配列）の分離
   - 未入力リレーションの `nullable: true`
+  - **コンテンツ参照 / 複数コンテンツ参照（`relation` / `relationList`）**:
+    - 参照先エンドポイント（`referencedApiEndpoint`）および表示名（`x-referenced-api-endpoint`, `x-referenced-api-name`）を YAML に明記。
+    - 参照先表示フィールド（`listViewFieldId`）およびそのフィールド名（`x-list-view-field-id`, `x-list-view-field-name`）も自動解決して記載。
+  - **カスタムフィールド（`customFields`）の全集約と参照情報の記載**:
+    - 未参照のものも含め、スキーマで定義されている全カスタムフィールドを `components.schemas` に集約出力。
+    - フィールド側でカスタムフィールドを参照（`customField` / `repeater`）している場合、参照先カスタムフィールドの `name` や ID（`x-custom-field-ids`, `x-custom-field-names`）を記載。
   - 画像（`media`: `url`, `width`, `height`, `alt`）およびファイル（`file`: `url`, `fileSize`）
   - 各種バリデーション（`minItems`/`maxItems`、推奨画像サイズ、日付形式、カスタム CSS クラスなど）
   - 公式クエリパラメータ（`depth`, `ids`, `draftKey`, `limit`, `offset`, `filters` など）
@@ -225,6 +231,7 @@ microCMS で自動採番された API エンドポイント（例: `2w26g39c3ibq
 | `select` | `array` | 単一選択時は `maxItems: 1`、候補値を `enum` に設定 |
 | `media` (画像) | `$ref: '#/components/schemas/MicroCMSImage'` | `url`, `width`, `height`, `alt` |
 | `file` (ファイル) | `$ref: '#/components/schemas/MicroCMSFile'` | `url`, `fileSize` |
-| `relation` | `$ref: '#/components/schemas/{ReferencedModel}'` | 未入力対応のため `nullable: true` 付与 |
-| `customField` (単一) | `$ref: '#/components/schemas/CustomField_...'` | 単一オブジェクトとして展開 |
-| `repeater` (複数) | `array` (`items: { oneOf: [...] }`) | `discriminator`（`fieldId`）付き判別共用体 |
+| `relation` | `$ref: '#/components/schemas/{ReferencedModel}'` | 未入力時 `nullable: true`、参照先API（`x-referenced-api-endpoint`, `x-referenced-api-name`）および表示フィールド（`x-list-view-field-id`, `x-list-view-field-name`）を記載 |
+| `relationList` | `array` (`items: { $ref: '...' }`) | 未入力時 `[]`、件数バリデーション（`minItems`/`maxItems`）反映、参照先API・フィールド情報を記載 |
+| `customField` (単一) | `$ref: '#/components/schemas/CustomField_...'` | 単一オブジェクトとして展開、参照カスタムフィールド名（`x-custom-field-names`）を記載 |
+| `repeater` (複数) | `array` (`items: { oneOf: [...] }`) | `discriminator`（`fieldId`）付き判別共用体、参照カスタムフィールド名（`x-custom-field-names`）を記載 |

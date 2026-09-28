@@ -15,7 +15,14 @@ export function toPascalCase(str) {
 /**
  * microCMSのフィールド定義をOpenAPIスキーマにマッピング
  */
-export function mapFieldToSchema(field, currentEndpoint, registeredCustomFields, referencedModels, fallbackFieldHints = {}) {
+export function mapFieldToSchema(
+    field,
+    currentEndpoint,
+    registeredCustomFields,
+    referencedModels,
+    fallbackFieldHints = {},
+    endpointContext = {}
+) {
     const schema = {};
 
     // 説明文の組み立て（name, description, isUnique, imageSize, dateFormat などの付加情報）
@@ -155,11 +162,48 @@ export function mapFieldToSchema(field, currentEndpoint, registeredCustomFields,
 
         case 'relation': {
             const refEndpoint = field.referencedApiEndpoint || 'relation';
-            const refModel = toPascalCase(refEndpoint);
+            const refEndpointInfo = endpointContext?.endpoints?.get?.(refEndpoint) ||
+                                    endpointContext?.endpoints?.get?.(refEndpoint.replace(/^api[-_]/, ''));
+            const refModel = refEndpointInfo?.modelName || toPascalCase(refEndpoint);
             referencedModels.add(refModel);
             if (field.listViewFieldId) {
                 fallbackFieldHints[refModel] = field.listViewFieldId;
             }
+
+            // 参照先情報
+            const refDisplayName = refEndpointInfo?.displayName;
+            const refFieldObj = refEndpointInfo?.fieldsMap?.get?.(field.listViewFieldId);
+            const refFieldName = refFieldObj?.name;
+
+            // 参照先情報のテキスト構築
+            let refText = `参照先API: ${refEndpoint}`;
+            if (refDisplayName && refDisplayName !== refEndpoint) {
+                refText += ` (${refDisplayName})`;
+            }
+            if (field.listViewFieldId) {
+                refText += refFieldName
+                    ? ` [参照フィールド: ${field.listViewFieldId} (${refFieldName})]`
+                    : ` [参照フィールド: ${field.listViewFieldId}]`;
+            }
+
+            if (schema.description) {
+                schema.description += ` - ${refText}`;
+            } else {
+                schema.description = refText;
+            }
+
+            // OpenAPI 拡張プロパティ
+            schema['x-referenced-api-endpoint'] = refEndpoint;
+            if (refDisplayName) {
+                schema['x-referenced-api-name'] = refDisplayName;
+            }
+            if (field.listViewFieldId) {
+                schema['x-list-view-field-id'] = field.listViewFieldId;
+                if (refFieldName) {
+                    schema['x-list-view-field-name'] = refFieldName;
+                }
+            }
+
             // relation は未入力時常に null が返る
             schema.allOf = [{ $ref: `#/components/schemas/${refModel}` }];
             schema.nullable = true;
@@ -170,11 +214,48 @@ export function mapFieldToSchema(field, currentEndpoint, registeredCustomFields,
         case 'relationList': {
             schema.type = 'array';
             const refEndpoint = field.referencedApiEndpoint || 'relation';
-            const refModel = toPascalCase(refEndpoint);
+            const refEndpointInfo = endpointContext?.endpoints?.get?.(refEndpoint) ||
+                                    endpointContext?.endpoints?.get?.(refEndpoint.replace(/^api[-_]/, ''));
+            const refModel = refEndpointInfo?.modelName || toPascalCase(refEndpoint);
             referencedModels.add(refModel);
             if (field.listViewFieldId) {
                 fallbackFieldHints[refModel] = field.listViewFieldId;
             }
+
+            // 参照先情報
+            const refDisplayName = refEndpointInfo?.displayName;
+            const refFieldObj = refEndpointInfo?.fieldsMap?.get?.(field.listViewFieldId);
+            const refFieldName = refFieldObj?.name;
+
+            // 参照先情報のテキスト構築
+            let refText = `参照先API: ${refEndpoint}`;
+            if (refDisplayName && refDisplayName !== refEndpoint) {
+                refText += ` (${refDisplayName})`;
+            }
+            if (field.listViewFieldId) {
+                refText += refFieldName
+                    ? ` [参照フィールド: ${field.listViewFieldId} (${refFieldName})]`
+                    : ` [参照フィールド: ${field.listViewFieldId}]`;
+            }
+
+            if (schema.description) {
+                schema.description += ` - ${refText}`;
+            } else {
+                schema.description = refText;
+            }
+
+            // OpenAPI 拡張プロパティ
+            schema['x-referenced-api-endpoint'] = refEndpoint;
+            if (refDisplayName) {
+                schema['x-referenced-api-name'] = refDisplayName;
+            }
+            if (field.listViewFieldId) {
+                schema['x-list-view-field-id'] = field.listViewFieldId;
+                if (refFieldName) {
+                    schema['x-list-view-field-name'] = refFieldName;
+                }
+            }
+
             schema.items = { $ref: `#/components/schemas/${refModel}` };
 
             if (field.relationListCountLimitValidation?.relationListCount) {
@@ -192,6 +273,24 @@ export function mapFieldToSchema(field, currentEndpoint, registeredCustomFields,
         case 'customField': {
             // 単一カスタムフィールド（Object）
             const cfIds = field.customFieldIds || [];
+            const cfNames = [];
+            const cfInfoTexts = [];
+
+            for (const id of cfIds) {
+                const cfInfo = endpointContext?.customFields?.get?.(`${currentEndpoint}_${id}`) ||
+                               endpointContext?.customFields?.get?.(id);
+                const name = cfInfo?.name || id;
+                cfNames.push(name);
+                cfInfoTexts.push(name !== id ? `${name} (${id})` : id);
+            }
+
+            if (cfIds.length > 0) {
+                const cfText = `参照カスタムフィールド: ${cfInfoTexts.join(', ')}`;
+                schema.description = schema.description ? `${schema.description} - ${cfText}` : cfText;
+                schema['x-custom-field-ids'] = cfIds;
+                schema['x-custom-field-names'] = cfNames;
+            }
+
             if (cfIds.length === 1) {
                 const targetId = cfIds[0];
                 const key = `${currentEndpoint}_${targetId}`;
@@ -220,6 +319,23 @@ export function mapFieldToSchema(field, currentEndpoint, registeredCustomFields,
             // 繰り返しフィールド（Array）
             schema.type = 'array';
             const cfIds = field.customFieldIds || [];
+            const cfNames = [];
+            const cfInfoTexts = [];
+
+            for (const id of cfIds) {
+                const cfInfo = endpointContext?.customFields?.get?.(`${currentEndpoint}_${id}`) ||
+                               endpointContext?.customFields?.get?.(id);
+                const name = cfInfo?.name || id;
+                cfNames.push(name);
+                cfInfoTexts.push(name !== id ? `${name} (${id})` : id);
+            }
+
+            if (cfIds.length > 0) {
+                const cfText = `参照カスタムフィールド: ${cfInfoTexts.join(', ')}`;
+                schema.description = schema.description ? `${schema.description} - ${cfText}` : cfText;
+                schema['x-custom-field-ids'] = cfIds;
+                schema['x-custom-field-names'] = cfNames;
+            }
 
             if (cfIds.length === 1) {
                 const targetId = cfIds[0];
@@ -444,7 +560,6 @@ export function generateOpenApi(targetFiles, config = {}) {
     const registeredCustomFields = {};
     const referencedModels = new Set();
     const fallbackFieldHints = {};
-    const usedCustomFieldKeys = new Set();
     const parsedFiles = [];
 
     const commonHeaders = {
@@ -461,7 +576,12 @@ export function generateOpenApi(targetFiles, config = {}) {
         '429': { $ref: '#/components/responses/TooManyRequests' },
     };
 
-    // 1パス目: ファイル名の判定・パース・カスタムフィールドの収集
+    const endpointContext = {
+        endpoints: new Map(),
+        customFields: new Map(),
+    };
+
+    // 1パス目: ファイル名の判定・パース・カスタムフィールドの収集とインデックス化
     for (const filePath of targetFiles) {
         const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
         const fileName = path.basename(filePath);
@@ -493,6 +613,33 @@ export function generateOpenApi(targetFiles, config = {}) {
             }
         }
 
+        const fieldsMap = new Map();
+        for (const f of content.apiFields || []) {
+            fieldsMap.set(f.fieldId, f);
+        }
+
+        const endpointInfo = {
+            endpoint,
+            alias: endpointConfig?.alias || endpoint,
+            modelName,
+            displayName,
+            isObject,
+            fieldsMap,
+            content,
+            endpointConfig,
+        };
+
+        // endpoint名（例: 'api-sites'）
+        endpointContext.endpoints.set(endpoint, endpointInfo);
+        // alias名（例: 'sites'）
+        if (endpointConfig?.alias) {
+            endpointContext.endpoints.set(endpointConfig.alias, endpointInfo);
+        }
+        // 'api-' 接頭辞を除いた名前（例: 'sites'）
+        if (endpoint.startsWith('api-') || endpoint.startsWith('api_')) {
+            endpointContext.endpoints.set(endpoint.slice(4), endpointInfo);
+        }
+
         parsedFiles.push({ endpoint, modelName, displayName, isObject, content, endpointConfig });
 
         // カスタムフィールドのインデックス化
@@ -502,40 +649,29 @@ export function generateOpenApi(targetFiles, config = {}) {
             if (!registeredCustomFields[cf.fieldId]) {
                 registeredCustomFields[cf.fieldId] = cfModelName;
             }
-        }
 
-        // 実際に利用されている customFieldIds を再帰的にマーク
-        function collectUsedCfIds(fields = []) {
-            for (const f of fields) {
-                if ((f.kind === 'repeater' || f.kind === 'customField') && f.customFieldIds) {
-                    for (const id of f.customFieldIds) {
-                        const fullKey = `${endpoint}_${id}`;
-                        if (!usedCustomFieldKeys.has(fullKey)) {
-                            usedCustomFieldKeys.add(fullKey);
-                            usedCustomFieldKeys.add(id);
-
-                            // ネストされたカスタムフィールドがあれば再帰探索
-                            const matchedCf = (content.customFields || []).find((c) => c.fieldId === id);
-                            if (matchedCf && matchedCf.fields) {
-                                collectUsedCfIds(matchedCf.fields);
-                            }
-                        }
-                    }
-                }
+            const cfInfo = {
+                fieldId: cf.fieldId,
+                name: cf.name,
+                fields: cf.fields || [],
+                endpoint,
+                modelName,
+                cfModelName,
+            };
+            endpointContext.customFields.set(`${endpoint}_${cf.fieldId}`, cfInfo);
+            if (endpointConfig?.alias) {
+                endpointContext.customFields.set(`${endpointConfig.alias}_${cf.fieldId}`, cfInfo);
+            }
+            if (!endpointContext.customFields.has(cf.fieldId)) {
+                endpointContext.customFields.set(cf.fieldId, cfInfo);
             }
         }
-
-        collectUsedCfIds(content.apiFields);
     }
 
-    // 2パス目: 実際に使用されている customFields のみスキーマ生成
+    // 2パス目: すべての customFields を components.schemas に生成・集約
     for (const item of parsedFiles) {
         for (const cf of item.content.customFields || []) {
             const key = `${item.endpoint}_${cf.fieldId}`;
-            if (!usedCustomFieldKeys.has(key) && !usedCustomFieldKeys.has(cf.fieldId)) {
-                continue;
-            }
-
             const cfModelName = registeredCustomFields[key] || registeredCustomFields[cf.fieldId];
             if (rootDoc.components.schemas[cfModelName]) continue;
 
@@ -548,14 +684,22 @@ export function generateOpenApi(targetFiles, config = {}) {
                     item.endpoint,
                     registeredCustomFields,
                     referencedModels,
-                    fallbackFieldHints
+                    fallbackFieldHints,
+                    endpointContext
                 );
                 if (f.required) cfRequired.push(f.fieldId);
             }
 
+            const cfDesc = cf.name
+                ? `${cf.name} (${item.displayName || item.modelName} カスタムフィールド)`
+                : `${cf.fieldId} (${item.displayName || item.modelName} カスタムフィールド)`;
+
             rootDoc.components.schemas[cfModelName] = {
                 type: 'object',
-                description: cf.name || cf.fieldId,
+                description: cfDesc,
+                'x-custom-field-id': cf.fieldId,
+                'x-custom-field-name': cf.name || cf.fieldId,
+                'x-parent-endpoint': item.endpoint,
                 properties: {
                     fieldId: {
                         type: 'string',
@@ -583,7 +727,8 @@ export function generateOpenApi(targetFiles, config = {}) {
                 endpoint,
                 registeredCustomFields,
                 referencedModels,
-                fallbackFieldHints
+                fallbackFieldHints,
+                endpointContext
             );
             if (field.required) requiredFields.push(field.fieldId);
         }
@@ -742,6 +887,89 @@ export function generateOpenApi(targetFiles, config = {}) {
             };
             console.log(`- 参照先スキーマを自動フォールバック補完: ${refModel} (表示名フィールド: ${hintField})`);
         }
+    }
+
+    // 5パス目: ドキュメント表示用タグおよびタググループの生成（Redoc等のHTMLで全スキーマを確実に表示するため）
+    const apiTags = parsedFiles.map((item) => ({
+        name: item.displayName,
+        description: `${item.displayName} API (${item.isObject ? 'オブジェクト形式' : 'リスト形式'})`,
+    }));
+
+    const cfSchemaNames = Object.keys(rootDoc.components.schemas).filter((name) =>
+        name.startsWith('CustomField_')
+    );
+    const contentSchemaNames = Object.keys(rootDoc.components.schemas).filter(
+        (name) =>
+            !name.startsWith('CustomField_') &&
+            !name.startsWith('MicroCMS') &&
+            !name.endsWith('ListResponse')
+    );
+    const commonSchemaNames = Object.keys(rootDoc.components.schemas).filter(
+        (name) => name.startsWith('MicroCMS') || name.endsWith('ListResponse')
+    );
+
+    const schemaTags = [];
+
+    // カスタムフィールドタグ（定義がある場合）
+    if (cfSchemaNames.length > 0) {
+        const cfMarkdownLines = [
+            '各 API で使用されるカスタムフィールドのスキーマ定義一覧です。\n',
+        ];
+        for (const name of cfSchemaNames) {
+            const sc = rootDoc.components.schemas[name];
+            const title = sc['x-custom-field-name'] || name;
+            cfMarkdownLines.push(`### ${title} (\`${name}\`)`);
+            if (sc.description) {
+                cfMarkdownLines.push(`${sc.description}\n`);
+            }
+            cfMarkdownLines.push(`<SchemaDefinition schemaRef="#/components/schemas/${name}" />\n`);
+        }
+        schemaTags.push({
+            name: 'カスタムフィールド (Custom Fields)',
+            description: cfMarkdownLines.join('\n'),
+        });
+    }
+
+    // データモデル定義タグ
+    if (contentSchemaNames.length > 0 || commonSchemaNames.length > 0) {
+        const modelMarkdownLines = [
+            '各コンテンツモデルおよび共通コンポーネントのスキーマ定義一覧です。\n',
+        ];
+        if (contentSchemaNames.length > 0) {
+            modelMarkdownLines.push('## コンテンツモデル\n');
+            for (const name of contentSchemaNames) {
+                modelMarkdownLines.push(`### ${name}`);
+                modelMarkdownLines.push(`<SchemaDefinition schemaRef="#/components/schemas/${name}" />\n`);
+            }
+        }
+        if (commonSchemaNames.length > 0) {
+            modelMarkdownLines.push('## 共通スキーマ・レスポンス\n');
+            for (const name of commonSchemaNames) {
+                modelMarkdownLines.push(`### ${name}`);
+                modelMarkdownLines.push(`<SchemaDefinition schemaRef="#/components/schemas/${name}" />\n`);
+            }
+        }
+        schemaTags.push({
+            name: 'スキーマ定義 (Schemas)',
+            description: modelMarkdownLines.join('\n'),
+        });
+    }
+
+    rootDoc.tags = [...apiTags, ...schemaTags];
+
+    // Redoc 用のタググループ定義 (x-tagGroups)
+    rootDoc['x-tagGroups'] = [
+        {
+            name: 'API エンドポイント',
+            tags: apiTags.map((t) => t.name),
+        },
+    ];
+
+    if (schemaTags.length > 0) {
+        rootDoc['x-tagGroups'].push({
+            name: 'スキーマ一覧',
+            tags: schemaTags.map((t) => t.name),
+        });
     }
 
     return rootDoc;
