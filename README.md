@@ -144,15 +144,15 @@ node build-docs.mjs --serve --port 8080
 
 ```json
 {
-  "serviceId": "jtekt-stings",
-  "title": "ジェイテクトSTINGS愛知 microCMS Content API",
+  "serviceId": "hogehoge",
+  "title": "hogehogeサイト microCMS Content API",
   "description": "microCMS スキーマから自動生成された OpenAPI 仕様書です。",
   "version": "1.0.0",
   "endpoints": {
-    "2w26g39c3ibq": {
-      "alias": "notices",
-      "modelName": "Notice",
-      "displayName": "お知らせ",
+    "blogs": {
+      "alias": "notes",
+      "modelName": "Notes",
+      "displayName": "ノート",
       "type": "list"
     },
     "category": {
@@ -171,8 +171,8 @@ microCMS で自動採番された API エンドポイント（例: `2w26g39c3ibq
 
 | 設定キー | 型 | 説明 |
 | :--- | :---: | :--- |
-| `alias` | `string` | OpenAPI のパス名。例えば `"alias": "notices"` とすると、`/notices`（一覧）および `/notices/{contentId}`（詳細）になります。 |
-| `modelName` | `string` | TypeScript や OpenAPI で使用されるスキーマ型名（PascalCase 推奨）。例: `"Notice"` とすると、単体は `Notice`、一覧レスポンスは `NoticeListResponse` になります。 |
+| `alias` | `string` | OpenAPI のパス名。例えば `"alias": "notes"` とすると、`/notes`（一覧）および `/notes/{contentId}`（詳細）になります。 |
+| `modelName` | `string` | TypeScript や OpenAPI で使用されるスキーマ型名（PascalCase 推奨）。例: `"Notes"` とすると、単体は `NoNotestice`、一覧レスポンスは `NotesListResponse` になります。 |
 | `displayName` | `string` | ドキュメントのタグや Summary に使われる日本語名称。例: `"お知らせ"` とすると、タグが `お知らせ` になり、サマリーが `お知らせ 一覧取得` になります。 |
 | `type` | `"list" \| "object"` | API の形式。未指定時は JSON スキーマから自動判定されますが、明示的に上書きも可能です。 |
 
